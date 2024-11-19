@@ -1,0 +1,67 @@
+services:
+# OLLAMA
+  ollama-server:
+    volumes:
+      - ./ollama/ollama:/root/.ollama
+    container_name: ollama-server
+    pull_policy: always
+    tty: true
+    restart: unless-stopped
+    image: ollama/ollama:latest
+# Make ollama server available from host machine
+    ports:
+      - 11434:11434
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+    networks:
+      - python-development-network
+# Check https://github.com/valiantlynx/ollama-docker/tree/main for NVIDIA GPU support
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+# Open WebUI
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    volumes:
+      - ./ollama/open-webui:/app/backend/data
+    depends_on:
+      - ollama-server
+    ports:
+      - 8888:8080
+    environment: # https://docs.openwebui.com/getting-started/env-configuration#default_models
+      - OLLAMA_BASE_URLS=http://ollama-server:11434 #comma separated ollama hosts
+      - ENV=dev
+      - WEBUI_AUTH=True
+      - WEBUI_NAME=AI Assistant
+      - WEBUI_URL=http://open-webui:8080/
+      - WEBUI_SECRET_KEY=t0pS3c!r3tPsSw0dr
+    restart: unless-stopped
+    networks:
+      - python-development-network
+
+# ANYTHINGLLM
+  anythingllm-server:
+    image: mintplexlabs/anythingllm:latest
+    container_name: anythingllm-server
+    ports:
+      - 8889:3001
+    cap_add:
+      - SYS_ADMIN
+    volumes:
+      - ./anythingllm:/app/server/storage
+      - ./anythingllm/.env:/app/server/.env
+    environment:
+      - STORAGE_DIR="/app/server/storage"
+    restart: unless-stopped
+    networks:
+      - python-development-network
+
+networks:
+  python-development-network:
+    external: true
